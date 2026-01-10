@@ -1,19 +1,30 @@
-defmodule ConvergeContext.MixProject do
+defmodule ConvergeLedger.MixProject do
   use Mix.Project
+
+  @version "0.1.0"
+  @source_url "https://github.com/kpernyer/converge-ledger"
 
   def project do
     [
-      app: :converge_context,
-      version: "0.1.0",
+      app: :converge_ledger,
+      version: @version,
       elixir: "~> 1.17",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       aliases: aliases(),
 
+      # Hex.pm
+      name: "Converge Ledger",
+      description: "Distributed append-only runtime substrate for Converge workflows",
+      package: package(),
+      docs: docs(),
+      source_url: @source_url,
+      homepage_url: @source_url,
+
       # Releases
       releases: [
-        converge_context: [
+        converge_ledger: [
           include_executables_for: [:unix],
           applications: [runtime_tools: :permanent]
         ]
@@ -24,7 +35,7 @@ defmodule ConvergeContext.MixProject do
   def application do
     [
       extra_applications: [:logger, :mnesia],
-      mod: {ConvergeContext.Application, []}
+      mod: {ConvergeLedger.Application, []}
     ]
   end
 
@@ -43,7 +54,44 @@ defmodule ConvergeContext.MixProject do
       # Development & Testing
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
-      {:stream_data, "~> 1.1", only: [:test]}
+      {:stream_data, "~> 1.1", only: [:test]},
+      {:ex_doc, "~> 0.31", only: :dev, runtime: false}
+    ]
+  end
+
+  defp package do
+    [
+      name: "converge_ledger",
+      maintainers: ["Kenneth Pernyer"],
+      licenses: ["MIT"],
+      links: %{
+        "GitHub" => @source_url,
+        "Changelog" => "#{@source_url}/blob/main/CHANGELOG.md"
+      },
+      files: ~w(
+        lib
+        priv/protos
+        .formatter.exs
+        mix.exs
+        README.md
+        LICENSE
+        CHANGELOG.md
+      )
+    ]
+  end
+
+  defp docs do
+    [
+      main: "readme",
+      extras: [
+        "README.md",
+        "ARCHITECTURE.md",
+        "CONTRIBUTING.md",
+        "CHANGELOG.md",
+        "LICENSE"
+      ],
+      source_ref: "v#{@version}",
+      source_url: @source_url
     ]
   end
 

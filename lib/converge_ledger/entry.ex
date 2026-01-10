@@ -1,4 +1,4 @@
-defmodule ConvergeContext.Entry do
+defmodule ConvergeLedger.Entry do
   @moduledoc """
   Represents a single append-only entry in a context.
 
@@ -49,7 +49,7 @@ defmodule ConvergeContext.Entry do
   """
   def to_record(%__MODULE__{} = entry) do
     {
-      ConvergeContext.Storage.Schema.entries_table(),
+      ConvergeLedger.Storage.Schema.entries_table(),
       entry.id,
       entry.context_id,
       entry.key,

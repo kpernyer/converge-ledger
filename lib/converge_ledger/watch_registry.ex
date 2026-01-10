@@ -1,4 +1,4 @@
-defmodule ConvergeContext.WatchRegistry do
+defmodule ConvergeLedger.WatchRegistry do
   @moduledoc """
   Registry for Watch stream subscribers.
 

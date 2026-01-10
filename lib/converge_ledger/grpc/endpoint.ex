@@ -1,6 +1,6 @@
-defmodule ConvergeContext.Grpc.Endpoint do
+defmodule ConvergeLedger.Grpc.Endpoint do
   @moduledoc """
-  gRPC endpoint for ConvergeContext.
+  gRPC endpoint for ConvergeLedger.
 
   Exposes the ContextService for external communication.
   """
@@ -9,5 +9,5 @@ defmodule ConvergeContext.Grpc.Endpoint do
 
   intercept(GRPC.Server.Interceptors.Logger)
 
-  run(ConvergeContext.Grpc.Server)
+  run(ConvergeLedger.Grpc.Server)
 end

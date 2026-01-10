@@ -1,4 +1,4 @@
-defmodule ConvergeContext.Grpc.Server do
+defmodule ConvergeLedger.Grpc.Server do
   @moduledoc """
   gRPC server implementation for ContextService.
 
@@ -16,9 +16,9 @@ defmodule ConvergeContext.Grpc.Server do
   use GRPC.Server, service: Converge.Context.V1.ContextService.Service
 
   alias Converge.Context.V1
-  alias ConvergeContext.Entry
-  alias ConvergeContext.Storage.Store
-  alias ConvergeContext.WatchRegistry
+  alias ConvergeLedger.Entry
+  alias ConvergeLedger.Storage.Store
+  alias ConvergeLedger.WatchRegistry
 
   require Logger
 

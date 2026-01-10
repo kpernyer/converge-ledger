@@ -1,4 +1,4 @@
-defmodule ConvergeContext.Cluster.MnesiaManager do
+defmodule ConvergeLedger.Cluster.MnesiaManager do
   @moduledoc """
   Manages Mnesia clustering.
 
@@ -8,7 +8,7 @@ defmodule ConvergeContext.Cluster.MnesiaManager do
 
   use GenServer
   require Logger
-  alias ConvergeContext.Storage.Schema
+  alias ConvergeLedger.Storage.Schema
 
   def start_link(opts) do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)

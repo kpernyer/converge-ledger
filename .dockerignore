@@ -1,0 +1,50 @@
+# Build artifacts
+_build/
+deps/
+*.ez
+
+# Generated files
+*.beam
+*.plt
+*.pot
+
+# Test and development
+test/
+.credo.exs
+.dialyzer/
+cover/
+
+# IDE and editor
+.elixir_ls/
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+doc/
+*.md
+!README.md
+
+# Docker
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# Local development
+.env
+.env.*
+*.local
+
+# Mnesia data
+Mnesia.*
+data/
+
+# OS files
+.DS_Store
+Thumbs.db

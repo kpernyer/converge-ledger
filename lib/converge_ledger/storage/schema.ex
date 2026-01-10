@@ -1,4 +1,4 @@
-defmodule ConvergeContext.Storage.Schema do
+defmodule ConvergeLedger.Storage.Schema do
   @moduledoc """
   Mnesia schema definitions for the context store.
 

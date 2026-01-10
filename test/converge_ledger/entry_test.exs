@@ -1,8 +1,8 @@
-defmodule ConvergeContext.EntryTest do
+defmodule ConvergeLedger.EntryTest do
   use ExUnit.Case, async: true
   use ExUnitProperties
 
-  alias ConvergeContext.Entry
+  alias ConvergeLedger.Entry
 
   # Generators for property tests
   defp context_id_gen do

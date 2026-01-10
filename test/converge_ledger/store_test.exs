@@ -1,9 +1,9 @@
-defmodule ConvergeContext.StoreTest do
+defmodule ConvergeLedger.StoreTest do
   use ExUnit.Case, async: false
   use ExUnitProperties
 
-  alias ConvergeContext.Storage.Schema
-  alias ConvergeContext.Storage.Store
+  alias ConvergeLedger.Storage.Schema
+  alias ConvergeLedger.Storage.Store
 
   setup do
     :mnesia.start()

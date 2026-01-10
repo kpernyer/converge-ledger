@@ -1,9 +1,9 @@
-defmodule ConvergeContext.WatchRegistryTest do
+defmodule ConvergeLedger.WatchRegistryTest do
   use ExUnit.Case
   use ExUnitProperties
 
-  alias ConvergeContext.Entry
-  alias ConvergeContext.WatchRegistry
+  alias ConvergeLedger.Entry
+  alias ConvergeLedger.WatchRegistry
 
   # Generators - use random bytes to ensure unique context IDs per check
   defp context_id_gen do

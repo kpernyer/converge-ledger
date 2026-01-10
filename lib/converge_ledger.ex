@@ -1,4 +1,4 @@
-defmodule ConvergeContext do
+defmodule ConvergeLedger do
   @moduledoc """
   Append-only shared context store for Converge.
 
@@ -40,14 +40,14 @@ defmodule ConvergeContext do
 
   ```elixir
   # Local Elixir API (for testing)
-  {:ok, entry} = ConvergeContext.append("my-context", "facts", payload)
-  {:ok, entries, seq} = ConvergeContext.get("my-context")
-  {:ok, blob, seq, meta} = ConvergeContext.snapshot("my-context")
-  {:ok, count, seq} = ConvergeContext.load("my-context", blob)
+  {:ok, entry} = ConvergeLedger.append("my-context", "facts", payload)
+  {:ok, entries, seq} = ConvergeLedger.get("my-context")
+  {:ok, blob, seq, meta} = ConvergeLedger.snapshot("my-context")
+  {:ok, count, seq} = ConvergeLedger.load("my-context", blob)
   ```
   """
 
-  alias ConvergeContext.Storage.Store
+  alias ConvergeLedger.Storage.Store
 
   @doc """
   Appends an entry to a context.

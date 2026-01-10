@@ -1,4 +1,4 @@
-defmodule ConvergeContext.Discovery do
+defmodule ConvergeLedger.Discovery do
   @moduledoc """
   Handles service discovery and grouping using Erlang's `pg` (Process Groups).
 

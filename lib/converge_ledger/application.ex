@@ -1,6 +1,6 @@
-defmodule ConvergeContext.Application do
+defmodule ConvergeLedger.Application do
   @moduledoc """
-  OTP Application for ConvergeContext.
+  OTP Application for ConvergeLedger.
 
   Starts the supervision tree with:
   - Mnesia schema initialization
@@ -15,7 +15,7 @@ defmodule ConvergeContext.Application do
   @impl true
   def start(_type, _args) do
     # Initialize Mnesia before starting supervised processes
-    case ConvergeContext.Storage.Schema.init() do
+    case ConvergeLedger.Storage.Schema.init() do
       :ok ->
         Logger.info("Mnesia initialized")
 
@@ -26,12 +26,12 @@ defmodule ConvergeContext.Application do
 
     children = base_children() ++ grpc_children()
 
-    opts = [strategy: :one_for_one, name: ConvergeContext.Supervisor]
+    opts = [strategy: :one_for_one, name: ConvergeLedger.Supervisor]
 
     case Supervisor.start_link(children, opts) do
       {:ok, pid} ->
         unless Mix.env() == :test do
-          Logger.info("ConvergeContext started on port #{grpc_port()}")
+          Logger.info("ConvergeLedger started on port #{grpc_port()}")
         end
 
         {:ok, pid}
@@ -43,8 +43,17 @@ defmodule ConvergeContext.Application do
 
   defp base_children do
     [
+      # Start pg scope (default)
+      %{id: :pg, start: {:pg, :start_link, []}},
+
+      # Cluster Supervisor
+      {Cluster.Supervisor, [Application.get_env(:libcluster, :topologies) || [], [name: ConvergeLedger.ClusterSupervisor]]},
+
+      # Mnesia Cluster Manager
+      ConvergeLedger.Cluster.MnesiaManager,
+
       # Watch registry for streaming subscriptions
-      ConvergeContext.WatchRegistry
+      ConvergeLedger.WatchRegistry
     ]
   end
 
@@ -55,7 +64,7 @@ defmodule ConvergeContext.Application do
     else
       [
         {GRPC.Server.Supervisor,
-         endpoint: ConvergeContext.Grpc.Endpoint, port: grpc_port(), start_server: true}
+         endpoint: ConvergeLedger.Grpc.Endpoint, port: grpc_port(), start_server: true}
       ]
     end
   end

@@ -7,7 +7,7 @@ config :logger, level: :info
 # Configure libcluster with Gossip strategy for VPC communication
 config :libcluster,
   topologies: [
-    converge_context: [
+    converge_ledger: [
       strategy: Cluster.Strategy.Gossip,
       config: [
         port: 45892,

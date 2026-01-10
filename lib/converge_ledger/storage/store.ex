@@ -1,6 +1,6 @@
-defmodule ConvergeContext.Storage.Store do
+defmodule ConvergeLedger.Storage.Store do
   @moduledoc """
-  Mnesia-backed append-only context store.
+Mnesia-backed append-only context store.
 
   This store is derivative, not authoritative:
   - It remembers what already happened
@@ -11,8 +11,8 @@ defmodule ConvergeContext.Storage.Store do
   The Rust engine remains the single semantic authority.
   """
 
-  alias ConvergeContext.Entry
-  alias ConvergeContext.Storage.Schema
+  alias ConvergeLedger.Entry
+  alias ConvergeLedger.Storage.Schema
 
   require Logger
 
@@ -25,9 +25,9 @@ defmodule ConvergeContext.Storage.Store do
   Returns `{:ok, entry}` with the full entry including assigned sequence number,
   or `{:error, reason}` on failure.
   """
-  def append(context_id, key, payload, metadata \\ %{})
+  def append(context_id, key, payload, metadata \\ %{}) 
       when is_binary(context_id) and is_binary(key) and is_binary(payload) and is_map(metadata) do
-    result =
+    result = 
       :mnesia.transaction(fn ->
         sequence = next_sequence(context_id)
         entry = Entry.new(context_id, key, payload, sequence, metadata)
@@ -60,7 +60,7 @@ defmodule ConvergeContext.Storage.Store do
     after_seq = Keyword.get(opts, :after_sequence, 0)
     limit = Keyword.get(opts, :limit, 0)
 
-    result =
+    result = 
       :mnesia.transaction(fn ->
         entries = fetch_entries(context_id, key_filter, after_seq, limit)
         latest_seq = get_current_sequence(context_id)
@@ -83,7 +83,7 @@ defmodule ConvergeContext.Storage.Store do
   Returns `{:ok, snapshot_blob, sequence, metadata}` or `{:error, reason}`.
   """
   def snapshot(context_id) when is_binary(context_id) do
-    result =
+    result = 
       :mnesia.transaction(fn ->
         entries = fetch_all_entries(context_id)
         latest_seq = get_current_sequence(context_id)
@@ -136,7 +136,7 @@ defmodule ConvergeContext.Storage.Store do
   Returns `{:ok, sequence}` or `{:error, reason}`.
   """
   def current_sequence(context_id) when is_binary(context_id) do
-    result =
+    result = 
       :mnesia.transaction(fn ->
         get_current_sequence(context_id)
       end)
@@ -176,21 +176,13 @@ defmodule ConvergeContext.Storage.Store do
   defp fetch_entries(context_id, key_filter, after_seq, limit) do
     table = Schema.entries_table()
 
-    # Use match_object for reliability in tests/ram_copies
-    pat = {:_, :_, context_id, :_, :_, :_, :_, :_}
-    raw_entries = :mnesia.match_object(table, pat, :read)
-    
-    IO.puts("STORE: Fetch raw: #{length(raw_entries)} for ctx=#{inspect(context_id)}")
-
-    entries =
-      raw_entries
+    # Use index on context_id
+    entries = 
+      :mnesia.index_read(table, context_id, :context_id)
       |> Enum.map(&Entry.from_record/1)
       |> Enum.filter(fn entry ->
-        keep = entry.sequence > after_seq and
+        entry.sequence > after_seq and 
           (is_nil(key_filter) or entry.key == key_filter)
-        
-        if not keep, do: Logger.debug("Filtered out: seq=#{entry.sequence} vs #{after_seq}, key=#{entry.key} vs #{inspect(key_filter)}")
-        keep
       end)
       |> Enum.sort_by(& &1.sequence)
 
@@ -210,7 +202,7 @@ defmodule ConvergeContext.Storage.Store do
   end
 
   defp entry_to_map(%Entry{} = entry) do
-    %{
+    %{ 
       id: entry.id,
       key: entry.key,
       payload: entry.payload,
@@ -220,9 +212,11 @@ defmodule ConvergeContext.Storage.Store do
     }
   end
 
-  defp map_to_entry(context_id, map) do
+  defp map_to_entry(context_id, map, generate_new_ids) do
+    id = if generate_new_ids, do: generate_id(), else: map.id
+    
     %Entry{
-      id: map.id,
+      id: id,
       context_id: context_id,
       key: map.key,
       payload: map.payload,
@@ -235,7 +229,7 @@ defmodule ConvergeContext.Storage.Store do
   defp deserialize_snapshot(blob) do
     try do
       {:ok, :erlang.binary_to_term(blob, [:safe])}
-    rescue
+    rescue 
       _ -> {:error, :invalid_snapshot_format}
     end
   end
@@ -258,10 +252,11 @@ defmodule ConvergeContext.Storage.Store do
   defp check_context_empty(_context_id, false), do: :ok
 
   defp do_load(context_id, snapshot_data) do
-    entries = Enum.map(snapshot_data.entries, &map_to_entry(context_id, &1))
+    generate_new_ids = context_id != snapshot_data.context_id
+    entries = Enum.map(snapshot_data.entries, &map_to_entry(context_id, &1, generate_new_ids))
     max_seq = snapshot_data.sequence
 
-    result =
+    result = 
       :mnesia.transaction(fn ->
         # Write all entries
         Enum.each(entries, fn entry ->
@@ -287,5 +282,9 @@ defmodule ConvergeContext.Storage.Store do
         Logger.error("Failed to load snapshot: #{inspect(reason)}")
         {:error, {:load_failed, reason}}
     end
+  end
+
+  defp generate_id do
+    :crypto.strong_rand_bytes(16) |> Base.encode16(case: :lower)
   end
 end

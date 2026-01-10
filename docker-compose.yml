@@ -1,0 +1,103 @@
+# Converge Ledger - Docker Compose
+#
+# Usage:
+#   docker-compose up        # Start single node
+#   docker-compose up -d     # Start in background
+#   docker-compose down      # Stop and remove
+#
+# For clustering:
+#   docker-compose --profile cluster up
+#
+# Copyright (c) 2025 Aprio One AB
+
+services:
+  # Single node (default)
+  ledger:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: converge-ledger
+    ports:
+      - "${GRPC_PORT:-50051}:50051"
+    environment:
+      - GRPC_PORT=50051
+      - RELEASE_NODE=ledger@ledger
+      - RELEASE_DISTRIBUTION=name
+      - RELEASE_COOKIE=${ERLANG_COOKIE:-converge_ledger_dev_cookie}
+    volumes:
+      - ledger_data:/app/data
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "50051"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Cluster node 1 (optional)
+  ledger1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: converge-ledger-1
+    profiles:
+      - cluster
+    ports:
+      - "50052:50051"
+    environment:
+      - GRPC_PORT=50051
+      - RELEASE_NODE=ledger1@ledger1
+      - RELEASE_DISTRIBUTION=name
+      - RELEASE_COOKIE=${ERLANG_COOKIE:-converge_ledger_dev_cookie}
+      - CLUSTER_NODES=ledger2@ledger2,ledger3@ledger3
+    volumes:
+      - ledger1_data:/app/data
+    depends_on:
+      - ledger2
+      - ledger3
+    restart: unless-stopped
+
+  # Cluster node 2 (optional)
+  ledger2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: converge-ledger-2
+    profiles:
+      - cluster
+    ports:
+      - "50053:50051"
+    environment:
+      - GRPC_PORT=50051
+      - RELEASE_NODE=ledger2@ledger2
+      - RELEASE_DISTRIBUTION=name
+      - RELEASE_COOKIE=${ERLANG_COOKIE:-converge_ledger_dev_cookie}
+      - CLUSTER_NODES=ledger1@ledger1,ledger3@ledger3
+    volumes:
+      - ledger2_data:/app/data
+    restart: unless-stopped
+
+  # Cluster node 3 (optional)
+  ledger3:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: converge-ledger-3
+    profiles:
+      - cluster
+    ports:
+      - "50054:50051"
+    environment:
+      - GRPC_PORT=50051
+      - RELEASE_NODE=ledger3@ledger3
+      - RELEASE_DISTRIBUTION=name
+      - RELEASE_COOKIE=${ERLANG_COOKIE:-converge_ledger_dev_cookie}
+      - CLUSTER_NODES=ledger1@ledger1,ledger2@ledger2
+    volumes:
+      - ledger3_data:/app/data
+    restart: unless-stopped
+
+volumes:
+  ledger_data:
+  ledger1_data:
+  ledger2_data:
+  ledger3_data:
