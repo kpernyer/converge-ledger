@@ -45,13 +45,14 @@ RUN mix release converge_ledger
 # =============================================================================
 # Stage 2: Runtime
 # =============================================================================
-FROM alpine:3.19 AS runtime
+FROM alpine:3.22 AS runtime
 
-# Install runtime dependencies
+# Install runtime dependencies (must match OpenSSL version from build stage)
 RUN apk add --no-cache \
     libstdc++ \
     ncurses-libs \
-    openssl
+    openssl \
+    libgcc
 
 # Create non-root user
 RUN addgroup -g 1000 converge && \

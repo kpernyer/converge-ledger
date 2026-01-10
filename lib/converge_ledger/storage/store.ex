@@ -1,6 +1,6 @@
 defmodule ConvergeLedger.Storage.Store do
   @moduledoc """
-Mnesia-backed append-only context store.
+  Mnesia-backed append-only context store.
 
   This store is derivative, not authoritative:
   - It remembers what already happened

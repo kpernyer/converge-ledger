@@ -12,6 +12,9 @@ defmodule ConvergeLedger.Application do
 
   require Logger
 
+  # Capture Mix.env at compile time (Mix is not available in releases)
+  @mix_env Mix.env()
+
   @impl true
   def start(_type, _args) do
     # Initialize Mnesia before starting supervised processes
@@ -30,7 +33,7 @@ defmodule ConvergeLedger.Application do
 
     case Supervisor.start_link(children, opts) do
       {:ok, pid} ->
-        unless Mix.env() == :test do
+        if start_grpc?() do
           Logger.info("ConvergeLedger started on port #{grpc_port()}")
         end
 
@@ -59,15 +62,18 @@ defmodule ConvergeLedger.Application do
 
   # Don't start gRPC server in test mode to avoid port conflicts
   defp grpc_children do
-    if Mix.env() == :test do
-      []
-    else
+    if start_grpc?() do
       [
         {GRPC.Server.Supervisor,
          endpoint: ConvergeLedger.Grpc.Endpoint, port: grpc_port(), start_server: true}
       ]
+    else
+      []
     end
   end
+
+  # Use compile-time captured Mix.env
+  defp start_grpc?, do: @mix_env != :test
 
   defp grpc_port do
     case System.get_env("GRPC_PORT") do
