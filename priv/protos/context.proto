@@ -1,0 +1,161 @@
+syntax = "proto3";
+
+package converge.context.v1;
+
+option elixir_module_prefix = "Converge.Context.V1";
+
+// ContextService provides append-only shared context storage.
+//
+// This service is derivative, not authoritative:
+// - It remembers what already happened
+// - It never decides or coordinates convergence
+// - It may lose data (engine can regenerate)
+// - It never mutates or rewrites history
+//
+// The Rust engine remains the single semantic authority.
+service ContextService {
+  // Append adds an entry to the context. Entries are immutable once added.
+  rpc Append(AppendRequest) returns (AppendResponse);
+
+  // Get retrieves all entries for a context.
+  rpc Get(GetRequest) returns (GetResponse);
+
+  // Snapshot serializes the entire context to a portable blob.
+  rpc Snapshot(SnapshotRequest) returns (SnapshotResponse);
+
+  // Load restores a context from a snapshot blob.
+  rpc Load(LoadRequest) returns (LoadResponse);
+
+  // Watch streams new entries as they are appended (optional).
+  rpc Watch(WatchRequest) returns (stream WatchEvent);
+}
+
+// Entry represents a single append-only fact in the context.
+message Entry {
+  // Unique identifier for this entry (assigned by the store).
+  string id = 1;
+
+  // The context key this entry belongs to (e.g., "facts", "intents", "traces").
+  string key = 2;
+
+  // Opaque payload - the Rust engine owns the schema.
+  bytes payload = 3;
+
+  // Monotonic sequence number within this context.
+  uint64 sequence = 4;
+
+  // Unix timestamp (nanoseconds) when the entry was appended.
+  uint64 appended_at_ns = 5;
+
+  // Optional metadata (e.g., agent_id, cycle_number).
+  map<string, string> metadata = 6;
+}
+
+// AppendRequest adds a new entry to the context.
+message AppendRequest {
+  // The context identifier (typically the Root Intent ID).
+  string context_id = 1;
+
+  // The context key this entry belongs to.
+  string key = 2;
+
+  // Opaque payload - the Rust engine owns the schema.
+  bytes payload = 3;
+
+  // Optional metadata.
+  map<string, string> metadata = 4;
+}
+
+message AppendResponse {
+  // The full entry with assigned id and sequence number.
+  Entry entry = 1;
+}
+
+// GetRequest retrieves entries from a context.
+message GetRequest {
+  // The context identifier.
+  string context_id = 1;
+
+  // Optional: filter by key (if empty, returns all entries).
+  string key = 2;
+
+  // Optional: only return entries with sequence > after_sequence.
+  uint64 after_sequence = 3;
+
+  // Optional: limit number of entries returned (0 = no limit).
+  uint32 limit = 4;
+}
+
+message GetResponse {
+  // The entries matching the request.
+  repeated Entry entries = 1;
+
+  // The highest sequence number in this context.
+  uint64 latest_sequence = 2;
+}
+
+// SnapshotRequest creates a portable snapshot of the context.
+message SnapshotRequest {
+  // The context identifier.
+  string context_id = 1;
+}
+
+message SnapshotResponse {
+  // The serialized context as an opaque blob.
+  bytes snapshot = 1;
+
+  // The sequence number at snapshot time.
+  uint64 sequence = 2;
+
+  // Snapshot metadata.
+  SnapshotMetadata metadata = 3;
+}
+
+message SnapshotMetadata {
+  // Unix timestamp (nanoseconds) when snapshot was created.
+  uint64 created_at_ns = 1;
+
+  // Number of entries in the snapshot.
+  uint64 entry_count = 2;
+
+  // Version for forward compatibility.
+  uint32 version = 3;
+}
+
+// LoadRequest restores a context from a snapshot.
+message LoadRequest {
+  // The context identifier to restore to.
+  string context_id = 1;
+
+  // The snapshot blob from a previous Snapshot call.
+  bytes snapshot = 2;
+
+  // If true, fails if context already has entries.
+  bool fail_if_exists = 3;
+}
+
+message LoadResponse {
+  // Number of entries restored.
+  uint64 entries_restored = 1;
+
+  // The sequence number after restoration.
+  uint64 latest_sequence = 2;
+}
+
+// WatchRequest subscribes to new entries in a context.
+message WatchRequest {
+  // The context identifier.
+  string context_id = 1;
+
+  // Optional: filter by key.
+  string key = 2;
+
+  // Start watching from this sequence (0 = from beginning).
+  uint64 from_sequence = 3;
+}
+
+// WatchEvent is streamed for each new entry.
+message WatchEvent {
+  // The newly appended entry.
+  Entry entry = 1;
+}
