@@ -176,10 +176,11 @@ defmodule ConvergeContext.Storage.Store do
   defp fetch_entries(context_id, key_filter, after_seq, limit) do
     table = Schema.entries_table()
 
-    # Use index on context_id
-    raw_entries = :mnesia.index_read(table, context_id, :context_id)
+    # Use match_object for reliability in tests/ram_copies
+    pat = {:_, :_, context_id, :_, :_, :_, :_, :_}
+    raw_entries = :mnesia.match_object(table, pat, :read)
     
-    Logger.debug("Fetch raw: #{length(raw_entries)} for ctx=#{context_id}")
+    IO.puts("STORE: Fetch raw: #{length(raw_entries)} for ctx=#{inspect(context_id)}")
 
     entries =
       raw_entries
