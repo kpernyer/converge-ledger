@@ -10,21 +10,23 @@ defmodule ConvergeLedger.DiscoveryTest do
 
     # Join group
     Discovery.join(context_id)
-    
+
     # Check membership
     members = Discovery.members(context_id)
     assert self() in members
     assert length(members) == 1
 
     # Another process joins
-    task = Task.async(fn ->
-      Discovery.join(context_id)
-      Process.sleep(100) # Keep alive
-    end)
-    
+    task =
+      Task.async(fn ->
+        Discovery.join(context_id)
+        # Keep alive
+        Process.sleep(100)
+      end)
+
     # Wait for propagation (pg is eventually consistent, but fast locally)
     Process.sleep(10)
-    
+
     members = Discovery.members(context_id)
     assert length(members) == 2
     assert task.pid in members

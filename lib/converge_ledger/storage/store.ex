@@ -25,9 +25,9 @@ defmodule ConvergeLedger.Storage.Store do
   Returns `{:ok, entry}` with the full entry including assigned sequence number,
   or `{:error, reason}` on failure.
   """
-  def append(context_id, key, payload, metadata \\ %{}) 
+  def append(context_id, key, payload, metadata \\ %{})
       when is_binary(context_id) and is_binary(key) and is_binary(payload) and is_map(metadata) do
-    result = 
+    result =
       :mnesia.transaction(fn ->
         sequence = next_sequence(context_id)
         entry = Entry.new(context_id, key, payload, sequence, metadata)
@@ -60,7 +60,7 @@ defmodule ConvergeLedger.Storage.Store do
     after_seq = Keyword.get(opts, :after_sequence, 0)
     limit = Keyword.get(opts, :limit, 0)
 
-    result = 
+    result =
       :mnesia.transaction(fn ->
         entries = fetch_entries(context_id, key_filter, after_seq, limit)
         latest_seq = get_current_sequence(context_id)
@@ -83,7 +83,7 @@ defmodule ConvergeLedger.Storage.Store do
   Returns `{:ok, snapshot_blob, sequence, metadata}` or `{:error, reason}`.
   """
   def snapshot(context_id) when is_binary(context_id) do
-    result = 
+    result =
       :mnesia.transaction(fn ->
         entries = fetch_all_entries(context_id)
         latest_seq = get_current_sequence(context_id)
@@ -136,7 +136,7 @@ defmodule ConvergeLedger.Storage.Store do
   Returns `{:ok, sequence}` or `{:error, reason}`.
   """
   def current_sequence(context_id) when is_binary(context_id) do
-    result = 
+    result =
       :mnesia.transaction(fn ->
         get_current_sequence(context_id)
       end)
@@ -177,11 +177,11 @@ defmodule ConvergeLedger.Storage.Store do
     table = Schema.entries_table()
 
     # Use index on context_id
-    entries = 
+    entries =
       :mnesia.index_read(table, context_id, :context_id)
       |> Enum.map(&Entry.from_record/1)
       |> Enum.filter(fn entry ->
-        entry.sequence > after_seq and 
+        entry.sequence > after_seq and
           (is_nil(key_filter) or entry.key == key_filter)
       end)
       |> Enum.sort_by(& &1.sequence)
@@ -202,7 +202,7 @@ defmodule ConvergeLedger.Storage.Store do
   end
 
   defp entry_to_map(%Entry{} = entry) do
-    %{ 
+    %{
       id: entry.id,
       key: entry.key,
       payload: entry.payload,
@@ -214,7 +214,7 @@ defmodule ConvergeLedger.Storage.Store do
 
   defp map_to_entry(context_id, map, generate_new_ids) do
     id = if generate_new_ids, do: generate_id(), else: map.id
-    
+
     %Entry{
       id: id,
       context_id: context_id,
@@ -229,7 +229,7 @@ defmodule ConvergeLedger.Storage.Store do
   defp deserialize_snapshot(blob) do
     try do
       {:ok, :erlang.binary_to_term(blob, [:safe])}
-    rescue 
+    rescue
       _ -> {:error, :invalid_snapshot_format}
     end
   end
@@ -256,7 +256,7 @@ defmodule ConvergeLedger.Storage.Store do
     entries = Enum.map(snapshot_data.entries, &map_to_entry(context_id, &1, generate_new_ids))
     max_seq = snapshot_data.sequence
 
-    result = 
+    result =
       :mnesia.transaction(fn ->
         # Write all entries
         Enum.each(entries, fn entry ->

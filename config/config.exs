@@ -11,7 +11,8 @@ config :libcluster,
   topologies: [
     converge_ledger: [
       strategy: Cluster.Strategy.Epmd,
-      config: [hosts: []] # In dev, we can pass hosts manually or rely on local discovery
+      # In dev, we can pass hosts manually or rely on local discovery
+      config: [hosts: []]
     ]
   ]
 

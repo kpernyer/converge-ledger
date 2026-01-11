@@ -163,9 +163,7 @@ defmodule ConvergeLedger.EntryTest do
       check all(
               entries <-
                 StreamData.list_of(
-                  StreamData.tuple(
-                    {context_id_gen(), key_gen(), payload_gen(), sequence_gen()}
-                  ),
+                  StreamData.tuple({context_id_gen(), key_gen(), payload_gen(), sequence_gen()}),
                   min_length: 2,
                   max_length: 100
                 )

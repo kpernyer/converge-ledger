@@ -50,7 +50,11 @@ defmodule ConvergeLedger.Application do
       %{id: :pg, start: {:pg, :start_link, []}},
 
       # Cluster Supervisor
-      {Cluster.Supervisor, [Application.get_env(:libcluster, :topologies) || [], [name: ConvergeLedger.ClusterSupervisor]]},
+      {Cluster.Supervisor,
+       [
+         Application.get_env(:libcluster, :topologies) || [],
+         [name: ConvergeLedger.ClusterSupervisor]
+       ]},
 
       # Mnesia Cluster Manager
       ConvergeLedger.Cluster.MnesiaManager,

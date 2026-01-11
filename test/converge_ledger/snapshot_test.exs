@@ -176,7 +176,8 @@ defmodule ConvergeLedger.SnapshotTest do
       check all(
               source_ctx <- context_id_gen(),
               target_ctx <- context_id_gen(),
-              operations <- StreamData.list_of(append_operation_gen(), min_length: 1, max_length: 20)
+              operations <-
+                StreamData.list_of(append_operation_gen(), min_length: 1, max_length: 20)
             ) do
         # Append entries to source (unique context per check, no clear needed)
         appended_entries =
@@ -253,7 +254,8 @@ defmodule ConvergeLedger.SnapshotTest do
               ctx1 <- context_id_gen(),
               ctx2 <- context_id_gen(),
               ctx3 <- context_id_gen(),
-              operations <- StreamData.list_of(append_operation_gen(), min_length: 1, max_length: 15)
+              operations <-
+                StreamData.list_of(append_operation_gen(), min_length: 1, max_length: 15)
             ) do
         # Append to ctx1 (unique per check)
         appended =
@@ -425,9 +427,10 @@ defmodule ConvergeLedger.SnapshotTest do
             :mnesia.foldr(fn rec, acc -> [rec | acc] end, [], table)
           end)
 
-        matching_entries = Enum.filter(all_entries, fn rec ->
-          elem(rec, 2) == source_ctx
-        end)
+        matching_entries =
+          Enum.filter(all_entries, fn rec ->
+            elem(rec, 2) == source_ctx
+          end)
 
         IO.puts(
           "DEBUG: pre=#{pre_count}, post=#{post_count}, by_atom=#{length(raw_read_atom)}, by_pos=#{length(raw_read_pos)}, manual_filter=#{length(matching_entries)}, source_ctx=#{source_ctx}, index=#{inspect(index_config)}, attrs=#{inspect(attributes)}"

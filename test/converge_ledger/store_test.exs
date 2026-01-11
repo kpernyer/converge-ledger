@@ -196,7 +196,8 @@ defmodule ConvergeLedger.StoreTest do
     property "all appended entries can be retrieved" do
       check all(
               context_id <- context_id_gen(),
-              operations <- StreamData.list_of(append_operation_gen(), min_length: 1, max_length: 20)
+              operations <-
+                StreamData.list_of(append_operation_gen(), min_length: 1, max_length: 20)
             ) do
         Schema.clear_all()
 
@@ -313,7 +314,8 @@ defmodule ConvergeLedger.StoreTest do
                 StreamData.list_of(context_id_gen(), min_length: 2, max_length: 5)
                 |> StreamData.map(&Enum.uniq/1)
                 |> StreamData.filter(&(length(&1) >= 2)),
-              counts <- StreamData.list_of(StreamData.integer(1..10), min_length: 2, max_length: 5)
+              counts <-
+                StreamData.list_of(StreamData.integer(1..10), min_length: 2, max_length: 5)
             ) do
         Schema.clear_all()
 
@@ -338,7 +340,8 @@ defmodule ConvergeLedger.StoreTest do
     property "key filter returns only matching entries" do
       check all(
               context_id <- context_id_gen(),
-              operations <- StreamData.list_of(append_operation_gen(), min_length: 1, max_length: 30)
+              operations <-
+                StreamData.list_of(append_operation_gen(), min_length: 1, max_length: 30)
             ) do
         Schema.clear_all()
 
@@ -429,7 +432,8 @@ defmodule ConvergeLedger.StoreTest do
     property "entries are always returned in sequence order" do
       check all(
               context_id <- context_id_gen(),
-              operations <- StreamData.list_of(append_operation_gen(), min_length: 1, max_length: 50)
+              operations <-
+                StreamData.list_of(append_operation_gen(), min_length: 1, max_length: 50)
             ) do
         Schema.clear_all()
 
