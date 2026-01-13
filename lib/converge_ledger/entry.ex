@@ -119,6 +119,33 @@ defmodule ConvergeLedger.Entry do
     }
   end
 
+  @doc """
+  Verifies the integrity of an entry by checking its content hash.
+
+  Returns:
+  - `{:ok, :verified}` if the content hash matches
+  - `{:ok, :no_hash}` if the entry has no content hash (legacy entry)
+  - `{:error, :hash_mismatch}` if the content hash doesn't match (tampered)
+  """
+  def verify_integrity(%__MODULE__{content_hash: nil}), do: {:ok, :no_hash}
+
+  def verify_integrity(%__MODULE__{} = entry) do
+    alias ConvergeLedger.Integrity.MerkleTree
+    computed_hash = MerkleTree.hash_entry(entry)
+
+    if computed_hash == entry.content_hash do
+      {:ok, :verified}
+    else
+      {:error, :hash_mismatch}
+    end
+  end
+
+  @doc """
+  Returns true if the entry has integrity fields set.
+  """
+  def has_integrity?(%__MODULE__{content_hash: nil}), do: false
+  def has_integrity?(%__MODULE__{content_hash: _}), do: true
+
   defp generate_id do
     :crypto.strong_rand_bytes(16) |> Base.encode16(case: :lower)
   end

@@ -203,7 +203,17 @@ defmodule ConvergeLedger.Integrity.MerkleTree do
     |> build_tree_level()
   end
 
-  defp do_generate_proof([_single], _index, proof), do: Enum.reverse(proof)
+  defp do_generate_proof([single], _index, proof) do
+    # Single element at this level means we're done, but if this is the root level
+    # and proof is empty, we need to add the self-sibling (Bitcoin-style)
+    final_proof = Enum.reverse(proof)
+    if final_proof == [] do
+      # Single-element tree: element is combined with itself
+      [{:right, single}]
+    else
+      final_proof
+    end
+  end
 
   defp do_generate_proof(hashes, index, proof) do
     # Build the next level and track which sibling we need

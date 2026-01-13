@@ -33,6 +33,7 @@ defmodule ConvergeLedger.Storage.Store do
   Each entry is assigned:
   - A sequence number (monotonically increasing per context)
   - A Lamport clock timestamp (for causal ordering across contexts)
+  - A content hash (SHA-256 for integrity verification)
 
   Returns `{:ok, entry}` with the full entry including assigned sequence number,
   or `{:error, reason}` on failure.
@@ -44,6 +45,9 @@ defmodule ConvergeLedger.Storage.Store do
         sequence = next_sequence(context_id)
         lamport_time = tick_lamport_clock(context_id)
         entry = Entry.new(context_id, key, payload, sequence, metadata, lamport_clock: lamport_time)
+        # Compute content hash for integrity verification
+        content_hash = MerkleTree.hash_entry(entry)
+        entry = %{entry | content_hash: content_hash}
         :mnesia.write(Entry.to_record(entry))
         entry
       end)
@@ -74,6 +78,8 @@ defmodule ConvergeLedger.Storage.Store do
         sequence = next_sequence(context_id)
         lamport_time = update_lamport_clock(context_id, received_lamport_time)
         entry = Entry.new(context_id, key, payload, sequence, metadata, lamport_clock: lamport_time)
+        content_hash = MerkleTree.hash_entry(entry)
+        entry = %{entry | content_hash: content_hash}
         :mnesia.write(Entry.to_record(entry))
         entry
       end)
@@ -328,7 +334,9 @@ defmodule ConvergeLedger.Storage.Store do
       payload: entry.payload,
       sequence: entry.sequence,
       appended_at_ns: entry.appended_at_ns,
-      metadata: entry.metadata
+      metadata: entry.metadata,
+      lamport_clock: entry.lamport_clock,
+      content_hash: entry.content_hash
     }
   end
 
@@ -342,7 +350,9 @@ defmodule ConvergeLedger.Storage.Store do
       payload: map.payload,
       sequence: map.sequence,
       appended_at_ns: map.appended_at_ns,
-      metadata: map.metadata
+      metadata: map.metadata,
+      lamport_clock: Map.get(map, :lamport_clock),
+      content_hash: Map.get(map, :content_hash)
     }
   end
 
@@ -408,8 +418,21 @@ defmodule ConvergeLedger.Storage.Store do
   end
 
   defp do_load(context_id, snapshot_data) do
-    generate_new_ids = context_id != snapshot_data.context_id
-    entries = Enum.map(snapshot_data.entries, &map_to_entry(context_id, &1, generate_new_ids))
+    context_changed = context_id != snapshot_data.context_id
+    generate_new_ids = context_changed
+
+    entries =
+      snapshot_data.entries
+      |> Enum.map(&map_to_entry(context_id, &1, generate_new_ids))
+      |> Enum.map(fn entry ->
+        # Recompute content hash if context changed (hash includes context_id)
+        if context_changed and entry.content_hash != nil do
+          %{entry | content_hash: MerkleTree.hash_entry(entry)}
+        else
+          entry
+        end
+      end)
+
     max_seq = snapshot_data.sequence
 
     result =

@@ -276,6 +276,65 @@ defmodule ConvergeLedger.StoreTest do
     end
   end
 
+  describe "content hash integration" do
+    alias ConvergeLedger.Entry
+
+    test "entries are assigned content hashes" do
+      {:ok, entry} = Store.append("ctx", "facts", "payload")
+      assert entry.content_hash != nil
+      assert is_binary(entry.content_hash)
+      assert byte_size(entry.content_hash) == 32  # SHA-256
+    end
+
+    test "content hash verifies correctly" do
+      {:ok, entry} = Store.append("ctx", "facts", "payload")
+      assert {:ok, :verified} = Entry.verify_integrity(entry)
+    end
+
+    test "different entries have different content hashes" do
+      {:ok, e1} = Store.append("ctx", "facts", "payload1")
+      {:ok, e2} = Store.append("ctx", "facts", "payload2")
+      assert e1.content_hash != e2.content_hash
+    end
+
+    test "same payload in different contexts has different hash (includes context_id)" do
+      {:ok, e1} = Store.append("ctx-a", "facts", "same-payload")
+      {:ok, e2} = Store.append("ctx-b", "facts", "same-payload")
+      assert e1.content_hash != e2.content_hash
+    end
+
+    test "tampered entry fails verification" do
+      {:ok, entry} = Store.append("ctx", "facts", "original")
+
+      # Tamper with the payload
+      tampered = %{entry | payload: "tampered!"}
+      assert {:error, :hash_mismatch} = Entry.verify_integrity(tampered)
+    end
+
+    test "has_integrity? returns true for entries with hash" do
+      {:ok, entry} = Store.append("ctx", "facts", "payload")
+      assert Entry.has_integrity?(entry) == true
+    end
+
+    test "append_with_received_time also sets content hash" do
+      {:ok, entry} = Store.append_with_received_time("ctx", "facts", "payload", 10)
+      assert entry.content_hash != nil
+      assert {:ok, :verified} = Entry.verify_integrity(entry)
+    end
+
+    test "retrieved entries can be verified" do
+      Store.append("ctx", "facts", "p1")
+      Store.append("ctx", "facts", "p2")
+      Store.append("ctx", "facts", "p3")
+
+      {:ok, entries, _} = Store.get("ctx")
+
+      for entry <- entries do
+        assert {:ok, :verified} = Entry.verify_integrity(entry)
+      end
+    end
+  end
+
   # Property Tests
 
   describe "property: append/get round-trip" do
