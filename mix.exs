@@ -86,6 +86,8 @@ defmodule ConvergeLedger.MixProject do
       extras: [
         "README.md",
         "ARCHITECTURE.md",
+        "AGENTS.md",
+        "SECURITY.md",
         "CONTRIBUTING.md",
         "CHANGELOG.md",
         "LICENSE"
