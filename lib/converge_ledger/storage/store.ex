@@ -27,6 +27,9 @@ defmodule ConvergeLedger.Storage.Store do
   # Version 2 adds Merkle root for integrity verification
   @snapshot_version 2
 
+  # Maximum payload size (4MB) to prevent DoS
+  @max_payload_size 4 * 1024 * 1024
+
   @doc """
   Appends an entry to the context.
 
@@ -40,25 +43,29 @@ defmodule ConvergeLedger.Storage.Store do
   """
   def append(context_id, key, payload, metadata \\ %{})
       when is_binary(context_id) and is_binary(key) and is_binary(payload) and is_map(metadata) do
-    result =
-      :mnesia.transaction(fn ->
-        sequence = next_sequence(context_id)
-        lamport_time = tick_lamport_clock(context_id)
-        entry = Entry.new(context_id, key, payload, sequence, metadata, lamport_clock: lamport_time)
-        # Compute content hash for integrity verification
-        content_hash = MerkleTree.hash_entry(entry)
-        entry = %{entry | content_hash: content_hash}
-        :mnesia.write(Entry.to_record(entry))
-        entry
-      end)
+    if byte_size(payload) > @max_payload_size do
+      {:error, :payload_too_large}
+    else
+      result =
+        :mnesia.transaction(fn ->
+          sequence = next_sequence(context_id)
+          lamport_time = tick_lamport_clock(context_id)
+          entry = Entry.new(context_id, key, payload, sequence, metadata, lamport_clock: lamport_time)
+          # Compute content hash for integrity verification
+          content_hash = MerkleTree.hash_entry(entry)
+          entry = %{entry | content_hash: content_hash}
+          :mnesia.write(Entry.to_record(entry))
+          entry
+        end)
 
-    case result do
-      {:atomic, entry} ->
-        {:ok, entry}
+      case result do
+        {:atomic, entry} ->
+          {:ok, entry}
 
-      {:aborted, reason} ->
-        Logger.error("Failed to append entry: #{inspect(reason)}")
-        {:error, {:append_failed, reason}}
+        {:aborted, reason} ->
+          Logger.error("Failed to append entry: #{inspect(reason)}")
+          {:error, {:append_failed, reason}}
+      end
     end
   end
 
@@ -73,24 +80,28 @@ defmodule ConvergeLedger.Storage.Store do
   def append_with_received_time(context_id, key, payload, received_lamport_time, metadata \\ %{})
       when is_binary(context_id) and is_binary(key) and is_binary(payload) and
              is_integer(received_lamport_time) and is_map(metadata) do
-    result =
-      :mnesia.transaction(fn ->
-        sequence = next_sequence(context_id)
-        lamport_time = update_lamport_clock(context_id, received_lamport_time)
-        entry = Entry.new(context_id, key, payload, sequence, metadata, lamport_clock: lamport_time)
-        content_hash = MerkleTree.hash_entry(entry)
-        entry = %{entry | content_hash: content_hash}
-        :mnesia.write(Entry.to_record(entry))
-        entry
-      end)
+    if byte_size(payload) > @max_payload_size do
+      {:error, :payload_too_large}
+    else
+      result =
+        :mnesia.transaction(fn ->
+          sequence = next_sequence(context_id)
+          lamport_time = update_lamport_clock(context_id, received_lamport_time)
+          entry = Entry.new(context_id, key, payload, sequence, metadata, lamport_clock: lamport_time)
+          content_hash = MerkleTree.hash_entry(entry)
+          entry = %{entry | content_hash: content_hash}
+          :mnesia.write(Entry.to_record(entry))
+          entry
+        end)
 
-    case result do
-      {:atomic, entry} ->
-        {:ok, entry}
+      case result do
+        {:atomic, entry} ->
+          {:ok, entry}
 
-      {:aborted, reason} ->
-        Logger.error("Failed to append entry with received time: #{inspect(reason)}")
-        {:error, {:append_failed, reason}}
+        {:aborted, reason} ->
+          Logger.error("Failed to append entry with received time: #{inspect(reason)}")
+          {:error, {:append_failed, reason}}
+      end
     end
   end
 

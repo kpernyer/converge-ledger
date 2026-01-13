@@ -226,12 +226,25 @@ current_seq     integer
 
 ⸻
 
+## Integrity & Distribution
+
+While the ledger is not authoritative, it must be **trustworthy** and **resilient**.
+
+- **Merkle Trees:** Used for state verification and efficient sync.
+- **Lamport Clocks:** Used for causal ordering of distributed events.
+- **Gossip Protocol:** Uses Erlang's `:pg` for service discovery.
+
+*See [AGENTS.md](AGENTS.md) for detailed process architecture and implementation patterns.*
+
+⸻
+
 ## Supervision Model
 
 ```
 ConvergeLedger.Supervisor
 ├── StorageSupervisor (Mnesia)
 ├── WatchRegistry (GenServer)
+├── MnesiaManager (Cluster Healing)
 └── GrpcServerSupervisor
     └── ContextService
 ```

@@ -39,6 +39,11 @@ defmodule ConvergeLedger.Grpc.Server do
           entry: entry_to_proto(entry)
         }
 
+      {:error, :payload_too_large} ->
+        raise GRPC.RPCError,
+          status: :resource_exhausted,
+          message: "Payload exceeds maximum allowed size"
+
       {:error, reason} ->
         raise GRPC.RPCError, status: :internal, message: "Append failed: #{inspect(reason)}"
     end
