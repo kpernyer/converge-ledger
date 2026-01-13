@@ -106,7 +106,8 @@ defmodule ConvergeLedger.EntryTest do
       record = Entry.to_record(entry)
 
       assert is_tuple(record)
-      assert tuple_size(record) == 8
+      # 10 fields: table, id, context_id, key, payload, sequence, appended_at_ns, metadata, lamport_clock, content_hash
+      assert tuple_size(record) == 10
       assert elem(record, 0) == :context_entries
       assert elem(record, 1) == entry.id
       assert elem(record, 2) == entry.context_id

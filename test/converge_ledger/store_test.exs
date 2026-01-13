@@ -10,7 +10,10 @@ defmodule ConvergeLedger.StoreTest do
     Schema.init()
 
     # Wait for tables to be ready
-    :mnesia.wait_for_tables([Schema.entries_table(), Schema.sequences_table()], 5000)
+    :mnesia.wait_for_tables(
+      [Schema.entries_table(), Schema.sequences_table(), Schema.lamport_clocks_table()],
+      5000
+    )
 
     Schema.clear_all()
     :ok
@@ -187,6 +190,89 @@ defmodule ConvergeLedger.StoreTest do
 
       assert seq_a == 2
       assert seq_b == 1
+    end
+  end
+
+  describe "Lamport clock integration" do
+    test "entries are assigned Lamport timestamps" do
+      {:ok, entry} = Store.append("ctx", "facts", "payload")
+      assert entry.lamport_clock == 1
+    end
+
+    test "Lamport clocks increase monotonically" do
+      {:ok, e1} = Store.append("ctx", "facts", "p1")
+      {:ok, e2} = Store.append("ctx", "facts", "p2")
+      {:ok, e3} = Store.append("ctx", "facts", "p3")
+
+      assert e1.lamport_clock == 1
+      assert e2.lamport_clock == 2
+      assert e3.lamport_clock == 3
+    end
+
+    test "current_lamport_time tracks the clock" do
+      {:ok, 0} = Store.current_lamport_time("new-ctx")
+
+      Store.append("new-ctx", "facts", "p1")
+      {:ok, time1} = Store.current_lamport_time("new-ctx")
+      assert time1 == 1
+
+      Store.append("new-ctx", "facts", "p2")
+      {:ok, time2} = Store.current_lamport_time("new-ctx")
+      assert time2 == 2
+    end
+
+    test "Lamport clocks are independent per context" do
+      Store.append("ctx-x", "facts", "p1")
+      Store.append("ctx-x", "facts", "p2")
+      Store.append("ctx-y", "facts", "p1")
+
+      {:ok, time_x} = Store.current_lamport_time("ctx-x")
+      {:ok, time_y} = Store.current_lamport_time("ctx-y")
+
+      assert time_x == 2
+      assert time_y == 1
+    end
+
+    test "append_with_received_time advances clock based on received timestamp" do
+      # Local context has time 2
+      Store.append("local", "facts", "p1")
+      Store.append("local", "facts", "p2")
+      {:ok, 2} = Store.current_lamport_time("local")
+
+      # Receive entry from remote with higher timestamp (10)
+      {:ok, entry} = Store.append_with_received_time("local", "facts", "remote-data", 10)
+
+      # New entry should have timestamp max(2, 10) + 1 = 11
+      assert entry.lamport_clock == 11
+      {:ok, 11} = Store.current_lamport_time("local")
+    end
+
+    test "append_with_received_time handles lower received timestamp" do
+      # Local context has time 10
+      for _ <- 1..10, do: Store.append("local2", "facts", "p")
+      {:ok, 10} = Store.current_lamport_time("local2")
+
+      # Receive entry with lower timestamp (5)
+      {:ok, entry} = Store.append_with_received_time("local2", "facts", "remote-data", 5)
+
+      # New entry should have timestamp max(10, 5) + 1 = 11
+      assert entry.lamport_clock == 11
+    end
+
+    test "causal ordering across contexts via received timestamps" do
+      # Context A creates an entry
+      {:ok, a_entry} = Store.append("ctx-a", "facts", "created by A")
+
+      # Context B receives and processes A's entry
+      {:ok, b_entry} = Store.append_with_received_time(
+        "ctx-b",
+        "facts",
+        "based on A",
+        a_entry.lamport_clock
+      )
+
+      # B's entry is causally after A's entry
+      assert b_entry.lamport_clock > a_entry.lamport_clock
     end
   end
 

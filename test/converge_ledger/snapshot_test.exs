@@ -53,8 +53,9 @@ defmodule ConvergeLedger.SnapshotTest do
       assert is_binary(blob)
       assert seq == 0
       assert meta.entry_count == 0
-      assert meta.version == 1
+      assert meta.version == 2  # Version 2 includes Merkle root
       assert meta.created_at_ns > 0
+      assert is_binary(meta.merkle_root)  # Hex-encoded Merkle root
     end
 
     test "snapshot metadata has correct entry count" do
@@ -215,6 +216,9 @@ defmodule ConvergeLedger.SnapshotTest do
               context_id <- context_id_gen(),
               count <- StreamData.integer(1..50)
             ) do
+        # Clear context before test
+        Schema.clear_all()
+
         # Append entries
         for _ <- 1..count, do: Store.append(context_id, "facts", "payload")
 
@@ -222,8 +226,9 @@ defmodule ConvergeLedger.SnapshotTest do
 
         assert meta.entry_count == count
         assert seq == count
-        assert meta.version == 1
+        assert meta.version == 2  # Version 2 includes Merkle root
         assert meta.created_at_ns > 0
+        assert is_binary(meta.merkle_root)
       end
     end
 

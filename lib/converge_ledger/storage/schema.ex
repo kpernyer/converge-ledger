@@ -10,6 +10,7 @@ defmodule ConvergeLedger.Storage.Schema do
   # Table names
   @entries_table :context_entries
   @sequences_table :context_sequences
+  @lamport_clocks_table :context_lamport_clocks
 
   @doc """
   Returns the entries table name.
@@ -20,6 +21,11 @@ defmodule ConvergeLedger.Storage.Schema do
   Returns the sequences table name.
   """
   def sequences_table, do: @sequences_table
+
+  @doc """
+  Returns the Lamport clocks table name.
+  """
+  def lamport_clocks_table, do: @lamport_clocks_table
 
   @doc """
   Initializes the Mnesia schema and creates tables.
@@ -41,6 +47,7 @@ defmodule ConvergeLedger.Storage.Schema do
   def clear_all do
     :mnesia.clear_table(@entries_table)
     :mnesia.clear_table(@sequences_table)
+    :mnesia.clear_table(@lamport_clocks_table)
     :ok
   end
 
@@ -68,16 +75,17 @@ defmodule ConvergeLedger.Storage.Schema do
 
   defp ensure_tables_created do
     with :ok <- create_entries_table(),
-         :ok <- create_sequences_table() do
+         :ok <- create_sequences_table(),
+         :ok <- create_lamport_clocks_table() do
       :ok
     end
   end
 
   defp create_entries_table do
-    # Entry record: {table, {context_id, sequence}, key, payload, appended_at_ns, metadata}
-    # Composite key: {context_id, sequence} for efficient range queries
+    # Entry record: {table, id, context_id, key, payload, sequence, appended_at_ns, metadata, lamport_clock, content_hash}
+    # Integrity fields (lamport_clock, content_hash) added for causal ordering and tamper detection
     attrs = [
-      attributes: [:id, :context_id, :key, :payload, :sequence, :appended_at_ns, :metadata],
+      attributes: [:id, :context_id, :key, :payload, :sequence, :appended_at_ns, :metadata, :lamport_clock, :content_hash],
       index: [:context_id, :key],
       type: :set
     ]
@@ -117,6 +125,29 @@ defmodule ConvergeLedger.Storage.Schema do
 
       {:aborted, reason} ->
         {:error, {:table_creation_failed, @sequences_table, reason}}
+    end
+  end
+
+  defp create_lamport_clocks_table do
+    # Lamport clock per context_id for causal ordering
+    # Record: {table, context_id, current_time}
+    attrs = [
+      attributes: [:context_id, :current_time],
+      type: :set
+    ]
+
+    attrs = attrs ++ storage_type()
+
+    case :mnesia.create_table(@lamport_clocks_table, attrs) do
+      {:atomic, :ok} ->
+        Logger.info("Created table #{@lamport_clocks_table}")
+        :ok
+
+      {:aborted, {:already_exists, @lamport_clocks_table}} ->
+        :ok
+
+      {:aborted, reason} ->
+        {:error, {:table_creation_failed, @lamport_clocks_table, reason}}
     end
   end
 

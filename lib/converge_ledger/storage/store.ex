@@ -9,18 +9,30 @@ defmodule ConvergeLedger.Storage.Store do
   - It never mutates or rewrites history
 
   The Rust engine remains the single semantic authority.
+
+  ## Integrity Features
+
+  - **Merkle roots**: Snapshots include a Merkle root for tamper detection
+  - **Lamport clocks**: Optional causal ordering of entries
+  - **Content hashes**: Optional integrity verification per entry
   """
 
   alias ConvergeLedger.Entry
   alias ConvergeLedger.Storage.Schema
+  alias ConvergeLedger.Integrity.MerkleTree
 
   require Logger
 
   # Snapshot version for forward compatibility
-  @snapshot_version 1
+  # Version 2 adds Merkle root for integrity verification
+  @snapshot_version 2
 
   @doc """
   Appends an entry to the context.
+
+  Each entry is assigned:
+  - A sequence number (monotonically increasing per context)
+  - A Lamport clock timestamp (for causal ordering across contexts)
 
   Returns `{:ok, entry}` with the full entry including assigned sequence number,
   or `{:error, reason}` on failure.
@@ -30,7 +42,8 @@ defmodule ConvergeLedger.Storage.Store do
     result =
       :mnesia.transaction(fn ->
         sequence = next_sequence(context_id)
-        entry = Entry.new(context_id, key, payload, sequence, metadata)
+        lamport_time = tick_lamport_clock(context_id)
+        entry = Entry.new(context_id, key, payload, sequence, metadata, lamport_clock: lamport_time)
         :mnesia.write(Entry.to_record(entry))
         entry
       end)
@@ -41,6 +54,36 @@ defmodule ConvergeLedger.Storage.Store do
 
       {:aborted, reason} ->
         Logger.error("Failed to append entry: #{inspect(reason)}")
+        {:error, {:append_failed, reason}}
+    end
+  end
+
+  @doc """
+  Appends an entry with a received Lamport timestamp.
+
+  Use this when receiving entries from another context/node to maintain
+  causal ordering. The local clock will be updated to max(local, received) + 1.
+
+  Returns `{:ok, entry}` or `{:error, reason}`.
+  """
+  def append_with_received_time(context_id, key, payload, received_lamport_time, metadata \\ %{})
+      when is_binary(context_id) and is_binary(key) and is_binary(payload) and
+             is_integer(received_lamport_time) and is_map(metadata) do
+    result =
+      :mnesia.transaction(fn ->
+        sequence = next_sequence(context_id)
+        lamport_time = update_lamport_clock(context_id, received_lamport_time)
+        entry = Entry.new(context_id, key, payload, sequence, metadata, lamport_clock: lamport_time)
+        :mnesia.write(Entry.to_record(entry))
+        entry
+      end)
+
+    case result do
+      {:atomic, entry} ->
+        {:ok, entry}
+
+      {:aborted, reason} ->
+        Logger.error("Failed to append entry with received time: #{inspect(reason)}")
         {:error, {:append_failed, reason}}
     end
   end
@@ -92,17 +135,22 @@ defmodule ConvergeLedger.Storage.Store do
 
     case result do
       {:atomic, {entries, latest_seq}} ->
+        # Compute Merkle root for integrity verification
+        merkle_root = MerkleTree.compute_root_from_entries(entries)
+
         metadata = %{
           created_at_ns: System.os_time(:nanosecond),
           entry_count: length(entries),
-          version: @snapshot_version
+          version: @snapshot_version,
+          merkle_root: MerkleTree.to_hex(merkle_root)
         }
 
         snapshot_data = %{
           version: @snapshot_version,
           context_id: context_id,
           entries: Enum.map(entries, &entry_to_map/1),
-          sequence: latest_seq
+          sequence: latest_seq,
+          merkle_root: merkle_root
         }
 
         blob = :erlang.term_to_binary(snapshot_data, [:compressed])
@@ -119,12 +167,25 @@ defmodule ConvergeLedger.Storage.Store do
 
   If `fail_if_exists` is true, returns an error if the context already has entries.
 
+  Options:
+  - `:verify_integrity` - If true, verifies Merkle root before loading (default: true)
+
   Returns `{:ok, entries_restored, latest_sequence}` or `{:error, reason}`.
   """
-  def load(context_id, snapshot_blob, fail_if_exists \\ false)
-      when is_binary(context_id) and is_binary(snapshot_blob) do
+  def load(context_id, snapshot_blob, opts \\ [])
+
+  def load(context_id, snapshot_blob, fail_if_exists) when is_boolean(fail_if_exists) do
+    # Backward compatibility: treat boolean as fail_if_exists option
+    load(context_id, snapshot_blob, fail_if_exists: fail_if_exists)
+  end
+
+  def load(context_id, snapshot_blob, opts) when is_binary(context_id) and is_binary(snapshot_blob) and is_list(opts) do
+    fail_if_exists = Keyword.get(opts, :fail_if_exists, false)
+    verify_integrity = Keyword.get(opts, :verify_integrity, true)
+
     with {:ok, snapshot_data} <- deserialize_snapshot(snapshot_blob),
          :ok <- validate_snapshot(snapshot_data),
+         :ok <- maybe_verify_integrity(snapshot_data, verify_integrity),
          :ok <- check_context_empty(context_id, fail_if_exists) do
       do_load(context_id, snapshot_data)
     end
@@ -144,6 +205,23 @@ defmodule ConvergeLedger.Storage.Store do
     case result do
       {:atomic, seq} -> {:ok, seq}
       {:aborted, reason} -> {:error, {:sequence_failed, reason}}
+    end
+  end
+
+  @doc """
+  Gets the current Lamport clock time for a context.
+
+  Returns `{:ok, lamport_time}` or `{:error, reason}`.
+  """
+  def current_lamport_time(context_id) when is_binary(context_id) do
+    result =
+      :mnesia.transaction(fn ->
+        get_current_lamport_time(context_id)
+      end)
+
+    case result do
+      {:atomic, time} -> {:ok, time}
+      {:aborted, reason} -> {:error, {:lamport_time_failed, reason}}
     end
   end
 
@@ -171,6 +249,48 @@ defmodule ConvergeLedger.Storage.Store do
       [] -> 0
       [{^table, ^context_id, current}] -> current
     end
+  end
+
+  # Lamport clock functions - must be called within a transaction
+
+  defp get_current_lamport_time(context_id) do
+    table = Schema.lamport_clocks_table()
+
+    case :mnesia.read(table, context_id) do
+      [] -> 0
+      [{^table, ^context_id, current}] -> current
+    end
+  end
+
+  defp tick_lamport_clock(context_id) do
+    table = Schema.lamport_clocks_table()
+
+    case :mnesia.read(table, context_id) do
+      [] ->
+        # First event in this context
+        :mnesia.write({table, context_id, 1})
+        1
+
+      [{^table, ^context_id, current}] ->
+        new_time = current + 1
+        :mnesia.write({table, context_id, new_time})
+        new_time
+    end
+  end
+
+  defp update_lamport_clock(context_id, received_time) do
+    table = Schema.lamport_clocks_table()
+
+    local_time =
+      case :mnesia.read(table, context_id) do
+        [] -> 0
+        [{^table, ^context_id, current}] -> current
+      end
+
+    # Lamport rule: max(local, received) + 1
+    new_time = max(local_time, received_time) + 1
+    :mnesia.write({table, context_id, new_time})
+    new_time
   end
 
   defp fetch_entries(context_id, key_filter, after_seq, limit) do
@@ -250,6 +370,42 @@ defmodule ConvergeLedger.Storage.Store do
   end
 
   defp check_context_empty(_context_id, false), do: :ok
+
+  defp maybe_verify_integrity(_snapshot_data, false), do: :ok
+
+  defp maybe_verify_integrity(%{merkle_root: nil}, true) do
+    # No Merkle root in snapshot (v1 snapshot), skip verification
+    :ok
+  end
+
+  defp maybe_verify_integrity(%{merkle_root: stored_root, entries: entries, context_id: context_id}, true) do
+    # Reconstruct entries and verify Merkle root
+    computed_root =
+      entries
+      |> Enum.map(fn map ->
+        %Entry{
+          id: map.id,
+          context_id: context_id,
+          key: map.key,
+          payload: map.payload,
+          sequence: map.sequence,
+          appended_at_ns: map.appended_at_ns,
+          metadata: map.metadata
+        }
+      end)
+      |> MerkleTree.compute_root_from_entries()
+
+    if computed_root == stored_root do
+      :ok
+    else
+      {:error, :integrity_verification_failed}
+    end
+  end
+
+  defp maybe_verify_integrity(_snapshot_data, true) do
+    # Snapshot doesn't have merkle_root field (old format)
+    :ok
+  end
 
   defp do_load(context_id, snapshot_data) do
     generate_new_ids = context_id != snapshot_data.context_id
