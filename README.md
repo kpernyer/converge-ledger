@@ -1,4 +1,8 @@
-# Converge Ledger
+# Converge: Semantic Governance & Alignment
+
+> Converge is a vision for **semantic governance**. We move from fragmented intent to unified, converged states through a deterministic alignment engine. Our mission is to provide a stable foundation for complex decision-making where human authority and AI agency coexist in a transparent, explainable ecosystem.
+
+## Converge Ledger
 
 **An optional, distributed, append-only runtime substrate for Converge**
 
@@ -235,9 +239,9 @@ If a proposed change violates that rule, it does not belong here.
 
 ## Documentation
 
-- **[ARCHITECTURE.md](ARCHITECTURE.md)** — Detailed architecture, design decisions, and implementation details
-- **[CONTRIBUTING.md](CONTRIBUTING.md)** — Development setup, testing requirements, and contribution guidelines
-- **[LICENSE](LICENSE)** — MIT License
+- **Knowledgebase:** See [converge-business/knowledgebase/](../converge-business/knowledgebase/)
+- **Architecture:** See [converge-business/knowledgebase/ledger-ARCHITECTURE.md](../converge-business/knowledgebase/ledger-ARCHITECTURE.md)
+- **Collaboration:** See [COLLABORATION.md](COLLABORATION.md)
 
 ⸻
 

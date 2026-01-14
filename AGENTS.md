@@ -1,16 +1,20 @@
 # Agents & Process Architecture
 
-This document details the active runtime components ("Agents") and data integrity structures within `ConvergeLedger`. It supplements [ARCHITECTURE.md](ARCHITECTURE.md) by focusing on implementation patterns and OTP behaviors.
+> Converge is a vision for **semantic governance**. We move from fragmented intent to unified, converged states through a deterministic alignment engine. Our mission is to provide a stable foundation for complex decision-making where human authority and AI agency coexist in a transparent, explainable ecosystem.
+
+This document details the active runtime components ("Agents") and data integrity structures within `ConvergeLedger`. It supplements [ledger-ARCHITECTURE.md](../converge-business/knowledgebase/ledger-ARCHITECTURE.md) by focusing on implementation patterns and OTP behaviors.
 
 ## Core Philosophy
 
 We follow the **"Functional Core, Imperative Shell"** pattern:
+
 - **Pure Logic:** Complex logic (Merkle trees, Lamport clocks) is implemented in pure functional modules with no side effects.
 - **State & Side Effects:** OTP processes (GenServers) are kept thin, responsible only for holding state, coordinating resources, or interfacing with the system (IO, Network).
 
 ## OTP Servers (Agents)
 
 ### 1. WatchRegistry
+
 **Role:** Pub/Sub mechanism for ledger updates.
 **Implementation:** `GenServer`
 **File:** `lib/converge_ledger/watch_registry.ex`
@@ -20,6 +24,7 @@ We follow the **"Functional Core, Imperative Shell"** pattern:
 - **Pattern:** Registry / Event Dispatcher. It decouples the writer (Store) from the readers (gRPC streams).
 
 ### 2. MnesiaManager
+
 **Role:** Cluster topology and replication manager.
 **Implementation:** `GenServer`
 **File:** `lib/converge_ledger/cluster/mnesia_manager.ex`
@@ -31,6 +36,7 @@ We follow the **"Functional Core, Imperative Shell"** pattern:
 - **Pattern:** Manager / Daemon. It ensures the storage layer adapts to the changing cluster topology without manual intervention.
 
 ### 3. Service Discovery
+
 **Role:** Location transparency for context services.
 **Implementation:** Wrapper around Erlang's `:pg` (Process Groups).
 **File:** `lib/converge_ledger/discovery.ex`
@@ -42,6 +48,7 @@ We follow the **"Functional Core, Imperative Shell"** pattern:
 ## Data Integrity & Ordering
 
 ### Merkle Trees
+
 **Role:** Cryptographic integrity and state verification.
 **Implementation:** Pure Functional Module
 **File:** `lib/converge_ledger/integrity/merkle_tree.ex`
@@ -54,6 +61,7 @@ We follow the **"Functional Core, Imperative Shell"** pattern:
   - **Proofs:** Generates inclusion proofs to verify a specific entry exists in the tree without retrieving the whole dataset.
 
 ### Lamport Clocks
+
 **Role:** Causal ordering of events in a distributed system.
 **Implementation:** Pure Functional Struct
 **File:** `lib/converge_ledger/integrity/lamport_clock.ex`

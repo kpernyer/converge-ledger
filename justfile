@@ -63,3 +63,18 @@ docs:
 # Dialyzer type checking
 dialyzer:
     mix dialyzer
+
+# Docker release
+IMAGE_NAME := "kpernyer/converge-ledger"
+VERSION := "0.1.1"
+
+docker-build:
+    docker build . -t {{IMAGE_NAME}}:{{VERSION}} -t {{IMAGE_NAME}}:latest
+
+docker-push:
+    docker push {{IMAGE_NAME}}:{{VERSION}}
+    docker push {{IMAGE_NAME}}:latest
+
+# Hex release
+publish:
+    mix hex.publish
